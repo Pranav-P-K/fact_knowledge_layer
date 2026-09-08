@@ -1,9 +1,16 @@
 """
-routers/documents.py — PDF upload and document listing endpoints.
+routers/documents.py — PDF upload, dataset seeding, and document listing endpoints.
 
 POST /documents/upload
-  Accepts a PDF file, runs the full extraction pipeline in the background,
-  and immediately returns the document id so the UI can poll for status.
+  Accepts a PDF file, runs the extraction pipeline in the background,
+  and immediately returns the document id.
+
+POST /documents/seed
+  Instantly loads one of the starter datasets (delhivery | india-macroeconomy)
+  with verified facts, embeddings, and relationships.
+
+DELETE /documents/reset
+  Wipes all documents, facts, and relationships to reset the workspace.
 
 GET /documents
   Returns all documents with their status and fact count.
@@ -19,16 +26,21 @@ import logging
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import database as db
 from embedder import embed_text
-from fact_extractor import extract_facts_from_chunk
+from fact_extractor import extract_facts_from_chunk, get_api_key
 from pdf_processor import extract_chunks
 from relationship_detector import detect_relationships_for_document
+from seed_data import seed_dataset
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 logger = logging.getLogger(__name__)
+
+
+class SeedRequest(BaseModel):
+    dataset: str = "delhivery"
 
 
 async def _process_pdf(doc_id: int, pdf_bytes: bytes) -> None:
@@ -38,11 +50,20 @@ async def _process_pdf(doc_id: int, pdf_bytes: bytes) -> None:
         chunks, page_count = extract_chunks(pdf_bytes)
         logger.info("Document %d: %d chunks from %d pages", doc_id, len(chunks), page_count)
 
-        # 2. Extract facts per chunk
+        if not get_api_key():
+            logger.warning("Document %d: No GEMINI_API_KEY set. Upload marked done with 0 facts.", doc_id)
+            db.update_document_status(doc_id, "done")
+            return
+
+        # 2. Extract facts per chunk (sample/cap at 30 chunks per document to avoid extreme quota exhaustion on 100-page PDFs)
         all_facts = []
-        for chunk in chunks:
+        # Filter chunks for substance
+        informative_chunks = [c for c in chunks if len(c.text.strip()) >= 80][:30]
+
+        for chunk in informative_chunks:
             facts = extract_facts_from_chunk(chunk.text, chunk.page_number)
             all_facts.extend(facts)
+            await asyncio.sleep(0.5)  # gentle delay for rate limits
 
         logger.info("Document %d: %d facts extracted", doc_id, len(all_facts))
 
@@ -82,7 +103,6 @@ async def upload_document(
     if not pdf_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    # Quick page count before full processing
     try:
         _, page_count = extract_chunks(pdf_bytes)
     except Exception:
@@ -92,6 +112,26 @@ async def upload_document(
     background_tasks.add_task(_process_pdf, doc_id, pdf_bytes)
 
     return {"document_id": doc_id, "filename": file.filename, "status": "processing"}
+
+
+@router.post("/seed")
+def seed_starter_dataset(req: SeedRequest) -> Dict[str, Any]:
+    """1-Click loading of Delhivery or India Macroeconomy starter datasets."""
+    try:
+        result = seed_dataset(req.dataset)
+        return {"status": "ok", "result": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Failed to seed dataset: %s", e)
+        raise HTTPException(status_code=500, detail=f"Seeding error: {str(e)}")
+
+
+@router.delete("/reset")
+def reset_all_data() -> Dict[str, Any]:
+    """Wipe all documents, facts, and relationships."""
+    db.clear_all_data()
+    return {"status": "ok", "message": "Knowledge layer reset successfully."}
 
 
 @router.get("")
@@ -105,7 +145,7 @@ def list_documents() -> List[Dict[str, Any]]:
             FROM documents d
             LEFT JOIN facts f ON f.document_id = d.id
             GROUP BY d.id
-            ORDER BY d.id DESC
+            ORDER BY d.id ASC
             """
         ).fetchall()
         return [dict(r) for r in rows]

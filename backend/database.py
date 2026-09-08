@@ -179,3 +179,16 @@ def get_facts_for_document(document_id: int):
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def clear_all_data() -> None:
+    """Wipe all documents, facts, and relationships."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM relationships")
+        conn.execute("DELETE FROM facts")
+        conn.execute("DELETE FROM documents")
+        conn.commit()
+    finally:
+        conn.close()
+

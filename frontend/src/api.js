@@ -13,12 +13,24 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ── Documents ────────────────────────────────────────────────────────────────
+// ── Documents & Seeding ──────────────────────────────────────────────────────
 
 export async function uploadDocument(file) {
   const form = new FormData();
   form.append("file", file);
   return request("/documents/upload", { method: "POST", body: form });
+}
+
+export async function seedDataset(dataset = "delhivery") {
+  return request("/documents/seed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dataset }),
+  });
+}
+
+export async function resetAll() {
+  return request("/documents/reset", { method: "DELETE" });
 }
 
 export async function listDocuments() {
@@ -58,4 +70,18 @@ export async function listRelationships({ type, docId } = {}) {
 
 export async function relationshipStats() {
   return request("/relationships/stats");
+}
+
+// ── Configuration ─────────────────────────────────────────────────────────────
+
+export async function getConfigStatus() {
+  return request("/config/status");
+}
+
+export async function saveApiKey(key) {
+  return request("/config/key", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
 }

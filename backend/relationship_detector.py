@@ -12,18 +12,16 @@ Design notes:
   - We only compare facts from *different* documents to avoid trivial self-matches.
   - TOP_K limits how many candidates per new fact are sent to the LLM.
   - The LLM receives both fact texts + their evidence quotes for context-aware reasoning.
+  - Retries with backoff if rate limits are hit.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 import textwrap
-from typing import Any, Dict, List
-
-import google.generativeai as genai
-from dotenv import load_dotenv
+import time
+from typing import Any, Dict, List, Optional
 
 from database import (
     get_all_facts_with_embeddings,
@@ -31,20 +29,9 @@ from database import (
     insert_relationship,
 )
 from embedder import cosine_similarity
+from fact_extractor import get_model
 
-load_dotenv()
 logger = logging.getLogger(__name__)
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
-_MODEL_NAME = "gemini-2.0-flash"
-_model = genai.GenerativeModel(
-    _MODEL_NAME,
-    generation_config=genai.GenerationConfig(
-        response_mime_type="application/json",
-        temperature=0.1,
-    ),
-)
 
 SIMILARITY_THRESHOLD = 0.68  # tuned: lower → more candidates, higher → fewer but more precise
 TOP_K = 5                    # max candidates per new fact sent to LLM
@@ -58,7 +45,7 @@ _CLASSIFY_SYSTEM = textwrap.dedent(
       SUPPORTS    — both facts say essentially the same thing (even if worded differently)
       CONTRADICTS — the facts make incompatible or opposite claims with no obvious reconciliation
       RECONCILES  — they appear to contradict but can be explained by context
-                    (e.g. different time periods, different scopes, different units, partial data)
+                    (e.g. different time periods, different scopes, different accounting standards, partial data)
       UNRELATED   — the facts are about different subjects and have no meaningful relationship
 
     Return a JSON object with:
@@ -71,24 +58,43 @@ _CLASSIFY_SYSTEM = textwrap.dedent(
 )
 
 
-def _classify_pair(fact_a: Dict[str, Any], fact_b: Dict[str, Any]) -> Dict[str, Any] | None:
+def _classify_pair(fact_a: Dict[str, Any], fact_b: Dict[str, Any], max_retries: int = 3) -> Optional[Dict[str, Any]]:
     """Call Gemini to classify the relationship between two facts."""
+    model = get_model()
+    if model is None:
+        return None
+
     prompt = (
         f"FACT A (id={fact_a['id']}):\n{fact_a['fact_text']}\n"
         f"Evidence: \"{fact_a.get('evidence_quote', '')}\"\n\n"
         f"FACT B (id={fact_b['id']}):\n{fact_b['fact_text']}\n"
         f"Evidence: \"{fact_b.get('evidence_quote', '')}\""
     )
-    try:
-        response = _model.generate_content([_CLASSIFY_SYSTEM, prompt])
-        raw = response.text.strip()
-        if raw.startswith("```"):
-            lines = raw.split("\n")
-            raw = "\n".join(lines[1:-1]) if len(lines) > 2 else raw
-        return json.loads(raw)
-    except Exception as e:
-        logger.error("Classification failed for facts (%s, %s): %s", fact_a["id"], fact_b["id"], e)
-        return None
+
+    backoff = 2.0
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content([_CLASSIFY_SYSTEM, prompt])
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                lines = raw.split("\n")
+                raw = "\n".join(lines[1:-1]) if len(lines) > 2 else raw
+            return json.loads(raw)
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "resourceexhausted" in err_msg or "429" in err_msg or "quota" in err_msg:
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        "Rate limit during relationship classification (%d, %d). Backoff %.1fs...",
+                        fact_a["id"], fact_b["id"], backoff,
+                    )
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+            logger.error("Classification failed for facts (%s, %s): %s", fact_a["id"], fact_b["id"], e)
+            return None
+
+    return None
 
 
 def detect_relationships_for_document(document_id: int) -> int:
@@ -98,12 +104,15 @@ def detect_relationships_for_document(document_id: int) -> int:
 
     Returns the number of new relationships stored.
     """
-    # Facts from the new document (need embeddings)
+    model = get_model()
+    if model is None:
+        logger.warning("GEMINI_API_KEY not configured. Skipping live relationship detection.")
+        return 0
+
     new_facts = get_facts_for_document(document_id)
     if not new_facts:
         return 0
 
-    # All facts from other documents
     existing_facts = get_all_facts_with_embeddings(exclude_document_id=document_id)
     if not existing_facts:
         return 0
@@ -114,7 +123,6 @@ def detect_relationships_for_document(document_id: int) -> int:
         if not new_fact["embedding"]:
             continue
 
-        # Compute similarity to all existing facts
         scored = []
         for ex_fact in existing_facts:
             if not ex_fact["embedding"]:
@@ -123,7 +131,6 @@ def detect_relationships_for_document(document_id: int) -> int:
             if sim >= SIMILARITY_THRESHOLD:
                 scored.append((sim, ex_fact))
 
-        # Sort descending and take top-K
         scored.sort(key=lambda x: x[0], reverse=True)
         candidates = scored[:TOP_K]
 
@@ -139,7 +146,6 @@ def detect_relationships_for_document(document_id: int) -> int:
             explanation = result.get("explanation", "")
             confidence = float(result.get("confidence", 0.0))
 
-            # Always store with lower id first to avoid duplicates
             id_a, id_b = sorted([new_fact["id"], ex_fact["id"]])
             insert_relationship(id_a, id_b, rel_type, explanation, confidence)
             stored += 1
