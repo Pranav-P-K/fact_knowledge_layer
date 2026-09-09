@@ -1,5 +1,5 @@
 """
-main.py — FastAPI application entry point.
+main.py — FastAPI application entry point with Superjoin Excel Exporter and Multi-Key Pool.
 
 Run with:
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -12,16 +12,20 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import List
 
-# Fix Windows console UTF-8 encoding so Indian Rupee (₹) and unicode dashes don't crash
+# Fix Windows console UTF-8 encoding safely
 if sys.platform == "win32":
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -34,19 +38,21 @@ logging.basicConfig(
 )
 
 import database as db
+from excel_exporter import generate_superjoin_excel_model
 from fact_extractor import get_api_key, set_api_key
+from key_pool import key_pool
 from routers import documents, facts, relationships
 
 # Initialise database on startup
 db.init_db()
 
 app = FastAPI(
-    title="Fact Knowledge Layer",
-    description="Extract, ground, and relate facts across PDFs.",
-    version="1.0.0",
+    title="Fact Knowledge Layer — Superjoin Finance",
+    description="Extract, ground, and relate facts across PDFs with Excel model export.",
+    version="1.2.0",
 )
 
-# Allow the Vite dev server (port 5173) and production build
+# Allow Vite dev server and any local client
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -64,9 +70,13 @@ class KeyRequest(BaseModel):
     key: str
 
 
+class MultiKeyRequest(BaseModel):
+    keys: List[str]
+
+
 @app.get("/", tags=["health"])
 def health() -> dict:
-    return {"status": "ok", "service": "Fact Knowledge Layer"}
+    return {"status": "ok", "service": "Fact Knowledge Layer for Superjoin Finance"}
 
 
 @app.get("/health", tags=["health"])
@@ -74,28 +84,48 @@ def health_check() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/export/excel", tags=["export"])
+def export_excel_model():
+    """Generate and download the Superjoin Financial Audit Model (.xlsx)."""
+    excel_buf = generate_superjoin_excel_model()
+    return Response(
+        content=excel_buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=superjoin_fact_audit_model.xlsx"
+        },
+    )
+
+
 @app.get("/config/status", tags=["config"])
 def config_status() -> dict:
-    key = get_api_key()
+    status = key_pool.get_status()
     return {
-        "has_api_key": bool(key),
-        "active_model": "gemini-2.0-flash",
+        "has_api_key": status["healthy_keys"] > 0,
+        "total_keys": status["total_keys"],
+        "healthy_keys": status["healthy_keys"],
+        "active_model": status["active_model"],
     }
 
 
+@app.get("/config/keys", tags=["config"])
+def get_key_pool_status() -> dict:
+    """Inspect detailed key health, request counts, and quarantine status."""
+    return key_pool.get_status()
+
+
+@app.post("/config/keys", tags=["config"])
+def update_key_pool(req: MultiKeyRequest) -> dict:
+    """Update or add multiple Gemini API keys for round-robin pooling."""
+    key_pool.set_keys(req.keys)
+    return {"status": "ok", "message": f"Updated pool with {len(req.keys)} key(s)", "pool": key_pool.get_status()}
+
+
 @app.post("/config/key", tags=["config"])
-def update_key(req: KeyRequest) -> dict:
+def update_single_key(req: KeyRequest) -> dict:
     new_key = req.key.strip()
     if not new_key:
         return {"status": "error", "message": "Key cannot be empty"}
 
     set_api_key(new_key)
-
-    # Optionally persist to backend/.env
-    try:
-        env_path = Path(__file__).parent / ".env"
-        env_path.write_text(f"GEMINI_API_KEY={new_key}\n", encoding="utf-8")
-    except Exception:
-        pass
-
-    return {"status": "ok", "message": "API key updated successfully"}
+    return {"status": "ok", "message": "API key updated in pool"}

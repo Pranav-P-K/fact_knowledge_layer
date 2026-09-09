@@ -1,110 +1,78 @@
 """
-fact_extractor.py — Extract structured facts from text chunks using Gemini.
+fact_extractor.py — Extract structured facts from text chunks using Gemini and Multi-Key Pool.
 
 Each fact has:
   - fact_text:      A concise, self-contained statement of the fact.
-  - fact_type:      A free-form category inferred from the content
-                    (e.g. 'financial_metric', 'personnel', 'address',
-                     'legal_clause', 'product_specification', …).
-  - attributes:     A flat key-value dict with domain-specific fields
-                    (e.g. {"amount": "₹10 Cr", "period": "FY2023"}).
+  - fact_type:      A free-form category inferred from the content.
+  - attributes:     A flat key-value dict enriched with canonical metrics, normalized numbers,
+                    and accounting standards (Ind AS vs Non-GAAP).
   - evidence_quote: The exact verbatim span from the source text that supports this fact.
   - page_number:    The page number supplied by the caller.
 
-Graceful handling:
-  - If GEMINI_API_KEY is missing or invalid, logs a warning and returns [] instead of crashing.
-  - Retries on rate limits (ResourceExhausted / 429) with exponential backoff.
+Graceful Multi-Key Rotation:
+  - Automatically acquires an active key from KeyPoolManager.
+  - If a key triggers HTTP 429, quarantines it and instantly falls back to the next key.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 import textwrap
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
-from dotenv import load_dotenv
 
-load_dotenv()
+from financial_normalizer import infer_accounting_standard, infer_canonical_metric, parse_normalized_number
+from key_pool import key_pool
+
 logger = logging.getLogger(__name__)
 
+# Preferred model: Gemini 2.0 Flash / 2.5 Flash / 3.5 Flash Lite
 _MODEL_NAME = "gemini-2.0-flash"
-_cached_key: Optional[str] = None
-_model: Optional[genai.GenerativeModel] = None
 
 
 def get_api_key() -> Optional[str]:
-    """Retrieve the Gemini API key from environment or memory."""
-    global _cached_key
-    if _cached_key:
-        return _cached_key
-    k = os.environ.get("GEMINI_API_KEY", "").strip()
-    if k and k not in ("placeholder", "your_gemini_api_key_here", "your_key_here"):
-        _cached_key = k
-        return k
-    return None
+    """Helper to check if any active key exists."""
+    status = key_pool.get_status()
+    return "active" if status["healthy_keys"] > 0 else None
 
 
 def set_api_key(key: str) -> None:
-    """Set or update the API key at runtime."""
-    global _cached_key, _model
-    _cached_key = key.strip()
-    os.environ["GEMINI_API_KEY"] = _cached_key
-    _model = None  # Force re-creation with new key
-
-
-def get_model() -> Optional[genai.GenerativeModel]:
-    """Lazily initialize the Gemini GenerativeModel if an API key is available."""
-    global _model
-    if _model is not None:
-        return _model
-
-    key = get_api_key()
-    if not key:
-        return None
-
-    try:
-        genai.configure(api_key=key)
-        _model = genai.GenerativeModel(
-            _MODEL_NAME,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.1,
-            ),
-        )
-        return _model
-    except Exception as e:
-        logger.error("Failed to initialize Gemini model: %s", e)
-        return None
+    """Set or update keys in the pool."""
+    key_pool.set_keys([key])
 
 
 _SYSTEM_PROMPT = textwrap.dedent(
     """\
-    You are a precise fact-extraction engine.
+    You are a financial and business fact-extraction engine for Superjoin Finance.
 
-    Given a passage from a document, extract every meaningful, verifiable fact.
+    Given a passage from a document (e.g. annual report, prospectus, earnings deck, economic review),
+    extract every meaningful, verifiable fact.
     Focus on:
-    - Numerical values (financial figures, dates, quantities, percentages, addresses)
-    - Personnel changes (appointments, resignations, roles)
-    - Legal or regulatory statements (compliance, violations, rulings)
-    - Product or service specifications
-    - Locations, infrastructure, and operational details
+    - Financial figures (Revenue, EBITDA, Net Income, Margins, Cash reserves, Debt)
+    - Operational & market metrics (Shipment volumes, tonnage, pin codes, market share)
+    - Macroeconomic indicators (GDP growth, CPI inflation, CAD, Fiscal Deficits)
+    - Accounting classifications (Ind AS / GAAP reported vs Adjusted / Non-GAAP)
+    - Personnel, governance, and infrastructure details
 
     For each fact, output a JSON object with exactly these fields:
     {
-      "fact_text": "<concise, self-contained statement>",
-      "fact_type": "<inferred category, e.g. financial_metric | personnel | address | legal_clause | specification | infrastructure>",
-      "attributes": { "<key>": "<value>", ... },
+      "fact_text": "<concise, self-contained statement with exact numbers and periods>",
+      "fact_type": "<inferred category, e.g. financial_metric | operational_metric | macro_metric | infrastructure | personnel>",
+      "attributes": {
+        "metric_name": "<raw metric name>",
+        "period": "<fiscal period, e.g. FY21, FY24, Q4 FY24>",
+        "reported_value": "<exact string value with units>",
+        "accounting_standard": "<Ind AS | Statutory | Non-GAAP Adjusted | Unspecified>"
+      },
       "evidence_quote": "<exact verbatim phrase from the passage that proves this fact>"
     }
 
     Return a JSON array of these objects. If no meaningful facts are present, return [].
     Do NOT invent facts not present in the passage.
-    Do NOT include trivial formatting or boilerplate as facts.
     """
 )
 
@@ -119,24 +87,21 @@ class ExtractedFact:
 
 
 def extract_facts_from_chunk(chunk_text: str, page_number: int, max_retries: int = 3) -> List[ExtractedFact]:
-    """Call Gemini and parse the structured fact list. Retries with backoff on rate limits."""
-    model = get_model()
-    if model is None:
-        logger.warning(
-            "GEMINI_API_KEY is not configured. Skipping LLM fact extraction on page %d.",
-            page_number,
-        )
-        return []
-
-    prompt = f"PASSAGE (page {page_number}):\n\n{chunk_text}"
-    backoff = 2.0
-
+    """Call Gemini across the multi-key pool with automatic 429 failover."""
     for attempt in range(max_retries):
+        model, key_used = key_pool.acquire_client(model_name=_MODEL_NAME)
+        if model is None:
+            logger.warning(
+                "No active Gemini API keys available in KeyPool. Skipping LLM extraction on page %d.",
+                page_number,
+            )
+            return []
+
+        prompt = f"PASSAGE (page {page_number}):\n\n{chunk_text}"
         try:
             response = model.generate_content([_SYSTEM_PROMPT, prompt])
             raw = response.text.strip()
 
-            # Strip markdown code fencing if present
             if raw.startswith("```"):
                 lines = raw.split("\n")
                 raw = "\n".join(lines[1:-1]) if len(lines) > 2 else raw
@@ -152,11 +117,24 @@ def extract_facts_from_chunk(chunk_text: str, page_number: int, max_retries: int
                     f_text = str(item.get("fact_text", "")).strip()
                     if not f_text:
                         continue
+
+                    raw_attrs = item.get("attributes", {}) if isinstance(item.get("attributes"), dict) else {}
+
+                    # Financial canonicalization & normalization
+                    c_metric = infer_canonical_metric(f_text)
+                    norm_val, base_unit = parse_normalized_number(f_text)
+                    acct_std = infer_accounting_standard(f_text, raw_attrs)
+
+                    raw_attrs["canonical_metric"] = c_metric
+                    raw_attrs["normalized_value"] = norm_val
+                    raw_attrs["base_unit"] = base_unit
+                    raw_attrs["accounting_basis"] = acct_std
+
                     facts.append(
                         ExtractedFact(
                             fact_text=f_text,
                             fact_type=str(item.get("fact_type", "general")).strip().lower(),
-                            attributes=item.get("attributes", {}) if isinstance(item.get("attributes"), dict) else {},
+                            attributes=raw_attrs,
                             evidence_quote=str(item.get("evidence_quote", "")).strip(),
                             page_number=page_number,
                         )
@@ -169,15 +147,18 @@ def extract_facts_from_chunk(chunk_text: str, page_number: int, max_retries: int
         except Exception as e:
             err_msg = str(e).lower()
             if "resourceexhausted" in err_msg or "429" in err_msg or "quota" in err_msg:
-                if attempt < max_retries - 1:
-                    logger.warning(
-                        "Rate limit hit on page %d (attempt %d/%d). Backing off %.1fs...",
-                        page_number, attempt + 1, max_retries, backoff,
-                    )
-                    time.sleep(backoff)
-                    backoff *= 2
-                    continue
-            logger.error("Gemini API error on page %d: %s", page_number, e)
-            return []
+                logger.warning(
+                    "429 Quota limit hit on key during page %d extraction. Quarantining key and rotating...",
+                    page_number,
+                )
+                if key_used:
+                    key_pool.report_429(key_used, cooldown_seconds=60.0)
+                # Next attempt will automatically select the next healthy key in the pool!
+                continue
+            else:
+                logger.error("Gemini API error on page %d: %s", page_number, e)
+                if key_used:
+                    key_pool.report_error(key_used)
+                return []
 
     return []

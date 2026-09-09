@@ -2,7 +2,7 @@
  * api.js — Centralised API client for the Fact Knowledge Layer backend.
  */
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, options);
@@ -72,10 +72,28 @@ export async function relationshipStats() {
   return request("/relationships/stats");
 }
 
-// ── Configuration ─────────────────────────────────────────────────────────────
+// ── Export & Models ───────────────────────────────────────────────────────────
+
+export function getExcelExportUrl() {
+  return `${BASE}/export/excel`;
+}
+
+// ── Multi-Key Provider Pool Configuration ─────────────────────────────────────
 
 export async function getConfigStatus() {
   return request("/config/status");
+}
+
+export async function getKeyPoolStatus() {
+  return request("/config/keys");
+}
+
+export async function updateKeyPool(keys) {
+  return request("/config/keys", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keys }),
+  });
 }
 
 export async function saveApiKey(key) {
