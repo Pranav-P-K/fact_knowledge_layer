@@ -225,3 +225,286 @@ tbody td { padding: 10px 14px; font-size: 0.85rem; vertical-align: top; }
   pointer-events: none;
   z-index: 100;
 }
+
+/* ── Responsive Architecture ─────────────────────────────────────────────────── */
+
+.app-header {
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  transition: all 0.2s ease;
+}
+
+.app-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.app-nav-tabs-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dataset-switcher-bar {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border-bottom: 1px solid var(--c-border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dataset-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stats-container {
+  background: var(--c-surface-2);
+  border-bottom: 1px solid var(--c-border);
+  padding: 10px 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  max-width: 1300px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.case-studies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.showcase-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.modal-dialog {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-container {
+  height: 560px;
+}
+
+/* ── Tablet & Laptop (< 1120px) ──────────────────────────────────────────────── */
+@media (max-width: 1120px) {
+  .app-header {
+    flex-wrap: wrap;
+    padding: 10px 16px;
+    gap: 10px;
+  }
+  
+  .app-nav-tabs-wrapper {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .app-nav-tabs-wrapper .tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .app-nav-tabs-wrapper .tab {
+    text-align: center;
+    padding: 7px 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .main-content {
+    padding: 18px 16px;
+  }
+}
+
+/* ── Mobile Screens (< 768px) ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 8px 12px;
+  }
+
+  .app-header-brand .brand-subtitle {
+    display: none;
+  }
+
+  .app-header-brand .brand-title {
+    font-size: 0.95rem;
+  }
+
+  .app-header-actions {
+    gap: 6px;
+  }
+
+  .app-header-actions .btn {
+    padding: 5px 8px !important;
+    font-size: 0.74rem !important;
+  }
+
+  .btn-text-full {
+    display: none !important;
+  }
+
+  .btn-text-mobile {
+    display: inline !important;
+  }
+
+  .dataset-switcher-bar {
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dataset-buttons-group {
+    width: 100%;
+  }
+
+  .dataset-btn {
+    flex: 1 1 calc(50% - 6px);
+    font-size: 0.76rem !important;
+    padding: 6px 8px !important;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .dataset-subtitle {
+    font-size: 0.7rem !important;
+    text-align: center;
+  }
+
+  .stats-container {
+    padding: 8px 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 8px;
+  }
+
+  .stat-chip {
+    padding: 8px 10px;
+    min-width: 0;
+  }
+
+  .stat-chip .value {
+    font-size: 1.3rem;
+  }
+
+  .stat-chip .label {
+    font-size: 0.64rem;
+  }
+
+  .main-content {
+    padding: 14px 10px;
+  }
+
+  .case-studies-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .showcase-badges {
+    width: 100%;
+    margin-top: 8px;
+    gap: 4px;
+  }
+
+  .showcase-badges .badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  .filter-tabs-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px;
+  }
+
+  .filter-tabs-bar .tabs {
+    width: 100% !important;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .filter-tabs-bar .tab {
+    padding: 6px 2px;
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .modal-dialog {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    padding: 16px !important;
+    border-radius: 10px;
+  }
+
+  .graph-container {
+    height: 380px !important;
+  }
+}
+
+/* ── Small Mobile Screens (< 480px) ─────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .app-header-brand .superjoin-badge {
+    display: none;
+  }
+
+  .app-nav-tabs-wrapper .tab {
+    font-size: 0.72rem;
+    padding: 6px 2px;
+  }
+
+  .stats-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .facts-filter-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .facts-filter-bar .field {
+    width: 100% !important;
+  }
+}

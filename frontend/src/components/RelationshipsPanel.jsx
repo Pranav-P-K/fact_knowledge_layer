@@ -46,7 +46,7 @@ export default function RelationshipsPanel({ onSelectFact }) {
               How the Fact Knowledge Layer identifies corroborations, genuine contradictions, contextual reconciliations, and extraction failures.
             </p>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div className="showcase-badges">
             <span className="badge" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", border: "1px solid rgba(34, 197, 94, 0.3)" }}>1. Corroboration</span>
             <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.3)" }}>2. Contradiction</span>
             <span className="badge" style={{ background: "rgba(234, 179, 8, 0.15)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.3)" }}>3. Reconciliation</span>
@@ -54,7 +54,7 @@ export default function RelationshipsPanel({ onSelectFact }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+        <div className="case-studies-grid">
           {/* Card 1: Corroboration */}
           <div style={{ background: "var(--c-surface)", padding: 14, borderRadius: 8, border: "1px solid rgba(34, 197, 94, 0.2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: "#4ade80", fontWeight: 700, fontSize: "0.88rem" }}>
@@ -110,11 +110,11 @@ export default function RelationshipsPanel({ onSelectFact }) {
       </section>
 
       {/* ── Filter Tabs ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div className="filter-tabs-bar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div className="tabs" style={{ width: "fit-content" }}>
           {["", "SUPPORTS", "CONTRADICTS", "RECONCILES"].map((t) => (
             <button key={t} className={`tab${filter === t ? " active" : ""}`} onClick={() => setFilter(t)}>
-              {t ? `${TYPE_META[t].emoji} ${TYPE_META[t].label}` : "All Relationships"}
+              {t ? `${TYPE_META[t].emoji} ${TYPE_META[t].label}` : "All"}
             </button>
           ))}
         </div>

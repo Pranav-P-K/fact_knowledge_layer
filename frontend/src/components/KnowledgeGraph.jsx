@@ -83,8 +83,8 @@ export default function KnowledgeGraph({ documents, onSelectFact, refreshKey }) 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Controls */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+        <div className="tabs" style={{ display: "flex", gap: 4 }}>
           {["", "SUPPORTS", "CONTRADICTS", "RECONCILES"].map((t) => (
             <button
               key={t}
@@ -97,10 +97,10 @@ export default function KnowledgeGraph({ documents, onSelectFact, refreshKey }) 
         </div>
 
         {/* Legend */}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 12, fontSize: "0.75rem", color: "var(--c-text-muted)", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, fontSize: "0.75rem", color: "var(--c-text-muted)", alignItems: "center", flexWrap: "wrap" }}>
           {Object.entries(TYPE_COLORS).map(([t, c]) => (
             <span key={t} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 20, height: 2, background: c, display: "inline-block" }} />
+              <span style={{ width: 16, height: 2, background: c, display: "inline-block" }} />
               {t}
             </span>
           ))}
@@ -120,7 +120,7 @@ export default function KnowledgeGraph({ documents, onSelectFact, refreshKey }) 
       )}
 
       {/* Graph */}
-      <div className="glass" style={{ overflow: "hidden", borderRadius: "var(--radius-lg)", height: 560, position: "relative" }}>
+      <div className="glass graph-container" style={{ overflow: "hidden", borderRadius: "var(--radius-lg)", position: "relative" }}>
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
             <div className="spinner" />

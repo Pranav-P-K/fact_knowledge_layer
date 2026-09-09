@@ -30,9 +30,9 @@ export default function Dashboard() {
   const [reloadingKeys, setReloadingKeys] = useState(false);
 
   const refresh = useCallback(() => {
-    listDocuments().then(setDocuments).catch(() => {});
-    relationshipStats().then(setStats).catch(() => {});
-    getConfigStatus().then(setConfig).catch(() => {});
+    listDocuments().then(setDocuments).catch(() => { });
+    relationshipStats().then(setStats).catch(() => { });
+    getConfigStatus().then(setConfig).catch(() => { });
     setRefreshKey((k) => k + 1);
   }, []);
 
@@ -46,7 +46,7 @@ export default function Dashboard() {
     try {
       const data = await getKeyPoolStatus();
       setKeyPoolData(data);
-    } catch (err) {}
+    } catch (err) { }
   };
 
   const handleOpenKeyModal = () => {
@@ -101,145 +101,142 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Top nav */}
-      <header style={{
-        background: "var(--c-surface)",
-        borderBottom: "1px solid var(--c-border)",
-        padding: "0 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        height: 62,
-        position: "sticky",
-        top: 0,
-        zIndex: 30,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <header className="app-header">
+        <div className="app-header-brand">
           <div style={{
             width: 36, height: 36,
             background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
             borderRadius: 9,
             display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
           }}>
             <Brain size={20} color="#fff" />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "-0.02em" }}>
+              <span className="brand-title" style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "-0.02em" }}>
                 Fact Knowledge Layer
               </span>
-              <span style={{ fontSize: "0.68rem", color: "#818cf8", background: "rgba(99, 102, 241, 0.15)", border: "1px solid rgba(99, 102, 241, 0.3)", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>
+              <span className="superjoin-badge" style={{ fontSize: "0.68rem", color: "#818cf8", background: "rgba(99, 102, 241, 0.15)", border: "1px solid rgba(99, 102, 241, 0.3)", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>
                 SUPERJOIN FINANCE
               </span>
             </div>
-            <p style={{ fontSize: "0.7rem", color: "var(--c-text-muted)" }}>
+            <p className="brand-subtitle" style={{ fontSize: "0.7rem", color: "var(--c-text-muted)" }}>
               Financial Document Auditing & Cross-Filing Reconciliation
             </p>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="tabs" style={{ marginLeft: "auto", flexWrap: "wrap" }}>
-          <button className={`tab${tab === "relationships" ? " active" : ""}`} onClick={() => setTab("relationships")}>
-            <Link2 size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />Relations & Cases
-          </button>
-          <button className={`tab${tab === "facts" ? " active" : ""}`} onClick={() => setTab("facts")}>
-            <FileText size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />Facts ({totalFacts})
-          </button>
-          <button className={`tab${tab === "graph" ? " active" : ""}`} onClick={() => setTab("graph")}>
-            <Brain size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />Knowledge Graph
-          </button>
-          <button className={`tab${tab === "upload" ? " active" : ""}`} onClick={() => setTab("upload")}>
-            <Plus size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />Upload PDF
-          </button>
+        {/* Navigation Tabs (in header on desktop, full-width row on tablet/mobile) */}
+        <div className="app-nav-tabs-wrapper">
+          <div className="tabs">
+            <button className={`tab${tab === "relationships" ? " active" : ""}`} onClick={() => setTab("relationships")}>
+              <Link2 size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+              <span>Relations</span>
+            </button>
+            <button className={`tab${tab === "facts" ? " active" : ""}`} onClick={() => setTab("facts")}>
+              <FileText size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+              <span>Facts ({totalFacts})</span>
+            </button>
+            <button className={`tab${tab === "graph" ? " active" : ""}`} onClick={() => setTab("graph")}>
+              <Brain size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+              <span>Graph</span>
+            </button>
+            <button className={`tab${tab === "upload" ? " active" : ""}`} onClick={() => setTab("upload")}>
+              <Plus size={13} style={{ verticalAlign: "middle", marginRight: 4 }} />
+              <span>Upload</span>
+            </button>
+          </div>
         </div>
 
-        {/* Export Excel Button */}
-        <a
-          href={getExcelExportUrl()}
-          className="btn"
-          style={{
-            background: "linear-gradient(135deg, #059669, #10b981)",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: "0.78rem",
-            padding: "6px 13px",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            textDecoration: "none",
-            borderRadius: 6,
-            boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
-          }}
-          download="superjoin_fact_audit_model.xlsx"
-          title="Download financial variance matrix and audit trail in Excel format"
-        >
-          <FileSpreadsheet size={15} /> Export Audit Sheet (.xlsx)
-        </a>
+        {/* Header Action Buttons */}
+        <div className="app-header-actions">
+          {/* Export Excel Button */}
+          <a
+            href={getExcelExportUrl()}
+            className="btn"
+            style={{
+              background: "linear-gradient(135deg, #059669, #10b981)",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: "0.78rem",
+              padding: "6px 12px",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              textDecoration: "none",
+              borderRadius: 6,
+              boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)",
+              whiteSpace: "nowrap",
+            }}
+            download="superjoin_fact_audit_model.xlsx"
+            title="Download financial variance matrix and audit trail in Excel format"
+          >
+            <FileSpreadsheet size={15} />
+            <span className="btn-text-full">Export Sheet (.xlsx)</span>
+            <span className="btn-text-mobile" style={{ display: "none" }}>Excel</span>
+          </a>
 
-        {/* Brownie Points Showcase Button */}
-        <button
-          className="btn btn-ghost"
-          style={{
-            padding: "6px 11px",
-            fontSize: "0.78rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            border: "1px solid rgba(129, 140, 248, 0.4)",
-            color: "#818cf8",
-          }}
-          onClick={() => setShowBrownieModal(true)}
-          title="Inspect Brownie Points & Architecture"
-        >
-          <Award size={14} /> Brownie Points
-        </button>
+          {/* Brownie Points Showcase Button */}
+          <button
+            className="btn btn-ghost"
+            style={{
+              padding: "6px 10px",
+              fontSize: "0.78rem",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              border: "1px solid rgba(129, 140, 248, 0.4)",
+              color: "#818cf8",
+              whiteSpace: "nowrap",
+            }}
+            onClick={() => setShowBrownieModal(true)}
+            title="Inspect Brownie Points & Architecture"
+          >
+            <Award size={14} />
+            <span className="btn-text-full">Brownie Points</span>
+            <span className="btn-text-mobile" style={{ display: "none" }}>Points</span>
+          </button>
 
-        {/* Multi-Key Pool Status Button */}
-        <button
-          className="btn btn-ghost"
-          style={{
-            padding: "6px 12px",
-            fontSize: "0.78rem",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            border: config.has_api_key ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(234, 179, 8, 0.4)",
-            color: config.has_api_key ? "#4ade80" : "#facc15",
-          }}
-          onClick={handleOpenKeyModal}
-          title="Inspect Multi-Key Provider Pool Telemetry"
-        >
-          <Key size={13} />
-          {config.has_api_key ? `Key Pool: ${config.healthy_keys} Active (.env) ✓` : "Key Pool: Config in .env"}
-        </button>
+          {/* Multi-Key Pool Status Button */}
+          <button
+            className="btn btn-ghost"
+            style={{
+              padding: "6px 10px",
+              fontSize: "0.78rem",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              border: config.has_api_key ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(234, 179, 8, 0.4)",
+              color: config.has_api_key ? "#4ade80" : "#facc15",
+              whiteSpace: "nowrap",
+            }}
+            onClick={handleOpenKeyModal}
+            title="Inspect Multi-Key Provider Pool Telemetry"
+          >
+            <Key size={13} />
+            <span>{config.has_api_key ? `${config.healthy_keys} Keys ✓` : "API Key"}</span>
+          </button>
 
-        <button className="btn btn-ghost" style={{ padding: "6px 10px" }} onClick={refresh} title="Refresh Data">
-          <RefreshCw size={14} />
-        </button>
+          <button className="btn btn-ghost" style={{ padding: "6px 8px" }} onClick={refresh} title="Refresh Data">
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </header>
 
 
       {/* Dataset Quick Switcher Bar */}
-      <div style={{
-        background: "linear-gradient(90deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)",
-        borderBottom: "1px solid var(--c-border)",
-        padding: "10px 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div className="dataset-switcher-bar">
+        <div className="dataset-buttons-group">
           <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: 5 }}>
-            <Sparkles size={14} color="#818cf8" /> 1-Click Starter Datasets:
+            <Sparkles size={14} color="#818cf8" /> Datasets:
           </span>
 
           <button
-            className="btn"
+            className="btn dataset-btn"
             style={{
-              padding: "6px 14px",
-              fontSize: "0.82rem",
+              padding: "6px 12px",
+              fontSize: "0.8rem",
               background: isDelhivery ? "var(--c-accent)" : "var(--c-surface-2)",
               color: isDelhivery ? "#fff" : "var(--c-text)",
               border: isDelhivery ? "none" : "1px solid var(--c-border)",
@@ -248,14 +245,14 @@ export default function Dashboard() {
             disabled={seeding}
             onClick={() => handleSeed("delhivery")}
           >
-            📦 Delhivery Logistics (3 PDFs) {isDelhivery && "✓"}
+            📦 Delhivery (3 PDFs) {isDelhivery && "✓"}
           </button>
 
           <button
-            className="btn"
+            className="btn dataset-btn"
             style={{
-              padding: "6px 14px",
-              fontSize: "0.82rem",
+              padding: "6px 12px",
+              fontSize: "0.8rem",
               background: isMacro ? "var(--c-accent)" : "var(--c-surface-2)",
               color: isMacro ? "#fff" : "var(--c-text)",
               border: isMacro ? "none" : "1px solid var(--c-border)",
@@ -264,49 +261,41 @@ export default function Dashboard() {
             disabled={seeding}
             onClick={() => handleSeed("india-macroeconomy")}
           >
-            🏛️ India Macroeconomy (3 PDFs) {isMacro && "✓"}
+            🏛️ Macroeconomy (3 PDFs) {isMacro && "✓"}
           </button>
 
           {documents.length > 0 && (
             <button
               className="btn btn-ghost"
-              style={{ padding: "6px 10px", fontSize: "0.76rem", color: "var(--c-contradicts)" }}
+              style={{ padding: "6px 8px", fontSize: "0.76rem", color: "var(--c-contradicts)" }}
               onClick={handleReset}
               title="Clear all documents and facts"
             >
-              <Trash2 size={13} style={{ marginRight: 4 }} /> Reset
+              <Trash2 size={13} style={{ marginRight: 3 }} /> Reset
             </button>
           )}
 
           {seeding && (
             <span style={{ fontSize: "0.78rem", color: "var(--c-accent)" }}>
-              Loading dataset...
+              Loading...
             </span>
           )}
         </div>
 
-        <div style={{ fontSize: "0.76rem", color: "var(--c-text-dim)" }}>
-          Offline Ready · Includes Pre-Computed Grounding & Relationships
+        <div className="dataset-subtitle" style={{ fontSize: "0.74rem", color: "var(--c-text-dim)" }}>
+          Offline Ready · Includes Pre-Computed Grounding & Models
         </div>
       </div>
 
       {/* Stats bar */}
-      <div style={{
-        background: "var(--c-surface-2)",
-        borderBottom: "1px solid var(--c-border)",
-        padding: "10px 24px",
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}>
+      <div className="stats-container">
         <div className="stat-chip">
           <span className="value">{documents.length}</span>
           <span className="label">Documents</span>
         </div>
         <div className="stat-chip">
           <span className="value">{totalFacts}</span>
-          <span className="label">Extracted Facts</span>
+          <span className="label">Extracted</span>
         </div>
         <div className="stat-chip">
           <span className="value" style={{ color: "var(--c-supports)" }}>{stats.SUPPORTS}</span>
@@ -331,7 +320,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main content */}
-      <main style={{ flex: 1, padding: "24px", maxWidth: 1300, margin: "0 auto", width: "100%" }}>
+      <main className="main-content">
         {tab === "relationships" && (
           <div>
             <div style={{ marginBottom: 16 }}>
@@ -439,11 +428,10 @@ export default function Dashboard() {
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 100, backdropFilter: "blur(4px)",
         }}>
-          <div className="glass" style={{
-            width: 580, maxWidth: "90vw",
-            padding: 24, borderRadius: 12,
-            background: "var(--c-surface)",
-            border: "1px solid var(--c-border)",
+          <div className="glass modal-dialog" style={{
+            width: "min(580px, 95vw)",
+            padding: 20,
+            margin: "auto",
             display: "flex", flexDirection: "column", gap: 16,
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--c-border)", paddingBottom: 12 }}>
@@ -514,7 +502,7 @@ export default function Dashboard() {
                 borderRadius: 6,
                 overflowX: "auto",
               }}>
-{`# Multi-key comma-separated list in backend/.env:
+                {`# Multi-key comma-separated list in backend/.env:
 GEMINI_API_KEYS=key1,key2,key3,key4,key5
 
 # Or individual numbered variables:
@@ -578,11 +566,11 @@ GEMINI_API_KEY_2=your_second_key`}
           display: "flex", alignItems: "center", justifyContent: "center",
           zIndex: 100, backdropFilter: "blur(4px)",
         }}>
-          <div className="glass" style={{
-            width: 680, maxWidth: "90vw", maxHeight: "88vh",
-            padding: 28, borderRadius: 12,
-            background: "var(--c-surface)",
-            border: "1px solid var(--c-border)",
+          <div className="glass modal-dialog" style={{
+            width: "min(680px, 95vw)",
+            maxHeight: "88vh",
+            padding: 24,
+            margin: "auto",
             display: "flex", flexDirection: "column",
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, borderBottom: "1px solid var(--c-border)", paddingBottom: 12 }}>

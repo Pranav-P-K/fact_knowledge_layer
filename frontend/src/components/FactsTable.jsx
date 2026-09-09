@@ -67,7 +67,7 @@ export default function FactsTable({ documents, onSelectFact, refreshKey }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Filter bar */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="facts-filter-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 200px" }}>
           <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--c-text-muted)" }} />
           <input
@@ -78,19 +78,19 @@ export default function FactsTable({ documents, onSelectFact, refreshKey }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select className="field" value={filterDoc} onChange={(e) => { setFilterDoc(e.target.value); setPage(1); }}>
+        <select className="field" style={{ flex: "1 1 120px" }} value={filterDoc} onChange={(e) => { setFilterDoc(e.target.value); setPage(1); }}>
           <option value="">All documents</option>
           {documents.map((d) => (
             <option key={d.id} value={d.id}>{d.filename}</option>
           ))}
         </select>
-        <select className="field" value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
+        <select className="field" style={{ flex: "1 1 100px" }} value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }}>
           <option value="">All types</option>
           {factTypes.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-        <select className="field" value={filterRel} onChange={(e) => { setFilterRel(e.target.value); setPage(1); }}>
+        <select className="field" style={{ flex: "1 1 100px" }} value={filterRel} onChange={(e) => { setFilterRel(e.target.value); setPage(1); }}>
           <option value="">All facts</option>
           <option value="yes">Has relationships</option>
           <option value="no">No relationships</option>
