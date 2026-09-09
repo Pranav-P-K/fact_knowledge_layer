@@ -32,7 +32,7 @@ from key_pool import key_pool
 
 logger = logging.getLogger(__name__)
 
-SIMILARITY_THRESHOLD = 0.68  # tuned: lower → more candidates, higher → fewer but more precise
+SIMILARITY_THRESHOLD = 0.50  # tuned for lightweight embeddings: captures financial metric overlap
 TOP_K = 5                    # max candidates per new fact sent to LLM
 
 _CLASSIFY_SYSTEM = textwrap.dedent(

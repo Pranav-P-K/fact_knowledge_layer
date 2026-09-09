@@ -90,7 +90,7 @@ The application is engineered to deploy as a **single unified web service** (bac
 3. Configure the service:
    - **Environment**: Python
    - **Build Command**: `cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt`
-   - **Start Command**: `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Start Command**: `cd backend && python main.py`
 4. In **Environment Variables**, add:
    - `NODE_VERSION`: `22`
    - `PYTHON_VERSION`: `3.11.9`
