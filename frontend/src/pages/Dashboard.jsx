@@ -10,7 +10,7 @@ import KnowledgeGraph from "../components/KnowledgeGraph";
 import RelationshipsPanel from "../components/RelationshipsPanel";
 import {
   listDocuments, relationshipStats, seedDataset, resetAll,
-  getConfigStatus, getKeyPoolStatus, updateKeyPool, getExcelExportUrl
+  getConfigStatus, getKeyPoolStatus, reloadKeyPool, getExcelExportUrl
 } from "../api";
 
 export default function Dashboard() {
@@ -23,11 +23,11 @@ export default function Dashboard() {
   const [config, setConfig] = useState({ has_api_key: false, healthy_keys: 0, total_keys: 0, active_model: "gemini-2.0-flash" });
   const [keyPoolData, setKeyPoolData] = useState(null);
 
-  // Modals
+  // Modals & Telemetry
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [showBrownieModal, setShowBrownieModal] = useState(false);
-  const [keysInput, setKeysInput] = useState("");
   const [keyMessage, setKeyMessage] = useState("");
+  const [reloadingKeys, setReloadingKeys] = useState(false);
 
   const refresh = useCallback(() => {
     listDocuments().then(setDocuments).catch(() => {});
@@ -77,25 +77,20 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveKeys = async (e) => {
-    e.preventDefault();
-    const raw = keysInput.trim();
-    if (!raw) return;
-
-    // Split by newlines or commas
-    const keys = raw.split(/[\n,]+/).map((k) => k.trim()).filter(Boolean);
+  const handleReloadKeys = async () => {
+    setReloadingKeys(true);
+    setKeyMessage("");
     try {
-      await updateKeyPool(keys);
-      setKeyMessage(`Successfully pooled ${keys.length} API key(s)!`);
-      loadKeyPool();
-      getConfigStatus().then(setConfig).catch(() => {});
-      setTimeout(() => {
-        setKeyMessage("");
-        setShowKeyModal(false);
-        setKeysInput("");
-      }, 1500);
+      const updated = await reloadKeyPool();
+      setKeyPoolData(updated);
+      const conf = await getConfigStatus();
+      setConfig(conf);
+      setKeyMessage(`Reloaded from .env: ${updated.healthy_keys} of ${updated.total_keys} key(s) active.`);
+      setTimeout(() => setKeyMessage(""), 3500);
     } catch (err) {
-      setKeyMessage("Error updating keys: " + err.message);
+      setKeyMessage("Error reloading .env: " + err.message);
+    } finally {
+      setReloadingKeys(false);
     }
   };
 
@@ -199,28 +194,30 @@ export default function Dashboard() {
           <Award size={14} /> Brownie Points
         </button>
 
-        {/* Multi-Key Pool Button */}
+        {/* Multi-Key Pool Status Button */}
         <button
           className="btn btn-ghost"
           style={{
-            padding: "6px 11px",
+            padding: "6px 12px",
             fontSize: "0.78rem",
             display: "flex",
             alignItems: "center",
-            gap: 5,
+            gap: 6,
             border: config.has_api_key ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(234, 179, 8, 0.4)",
             color: config.has_api_key ? "#4ade80" : "#facc15",
           }}
           onClick={handleOpenKeyModal}
+          title="Inspect Multi-Key Provider Pool Telemetry"
         >
           <Key size={13} />
-          {config.has_api_key ? `Key Pool: ${config.healthy_keys} Active ✓` : "Set API Keys"}
+          {config.has_api_key ? `Key Pool: ${config.healthy_keys} Active (.env) ✓` : "Key Pool: Config in .env"}
         </button>
 
         <button className="btn btn-ghost" style={{ padding: "6px 10px" }} onClick={refresh} title="Refresh Data">
           <RefreshCw size={14} />
         </button>
       </header>
+
 
       {/* Dataset Quick Switcher Bar */}
       <div style={{
@@ -377,20 +374,20 @@ export default function Dashboard() {
             <h2 style={{ fontWeight: 700, marginBottom: 16 }}>Upload Custom PDFs</h2>
             {!config.has_api_key && (
               <div style={{
-                background: "rgba(234, 179, 8, 0.1)",
-                border: "1px solid rgba(234, 179, 8, 0.3)",
+                background: "rgba(99, 102, 241, 0.1)",
+                border: "1px solid rgba(99, 102, 241, 0.3)",
                 borderRadius: 8,
                 padding: "12px 16px",
                 marginBottom: 16,
                 fontSize: "0.84rem",
-                color: "#facc15",
+                color: "#a5b4fc",
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
               }}>
                 <AlertCircle size={18} flexShrink={0} />
                 <div>
-                  <strong>Gemini API Key Required for Live Uploads:</strong> Please click <em>"Set API Keys"</em> in the top-right to enable live extraction across your multi-key pool.
+                  <strong>Environment Configuration Notice:</strong> To process newly uploaded custom PDFs, configure your Gemini key(s) in <code>backend/.env</code>. The pre-seeded starter datasets (Delhivery & India Macroeconomy) work 100% offline without any API keys required.
                 </div>
               </div>
             )}
@@ -434,7 +431,7 @@ export default function Dashboard() {
         onSelectFact={(id) => setSelectedFactId(id)}
       />
 
-      {/* ── Multi-Key Pool Modal ── */}
+      {/* ── Multi-Key Pool Telemetry Modal ── */}
       {showKeyModal && (
         <div style={{
           position: "fixed", inset: 0,
@@ -443,33 +440,45 @@ export default function Dashboard() {
           zIndex: 100, backdropFilter: "blur(4px)",
         }}>
           <div className="glass" style={{
-            width: 520, maxWidth: "90vw",
+            width: 580, maxWidth: "90vw",
             padding: 24, borderRadius: 12,
             background: "var(--c-surface)",
             border: "1px solid var(--c-border)",
+            display: "flex", flexDirection: "column", gap: 16,
           }}>
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
-              <Server size={18} color="var(--c-accent)" /> Multi-Key Round-Robin Provider Pool
-            </h3>
-            <p style={{ fontSize: "0.82rem", color: "var(--c-text-muted)", marginBottom: 14 }}>
-              Pool up to 5+ free-tier Gemini API keys. The system rotates requests round-robin and quarantines rate-limited keys (429) automatically to maximize live throughput.
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--c-border)", paddingBottom: 12 }}>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                <Server size={18} color="var(--c-accent)" /> Key Pool Telemetry & Rate-Limit Monitor
+              </h3>
+              <button className="btn btn-ghost" onClick={() => { setShowKeyModal(false); setKeyMessage(""); }} style={{ padding: "4px 8px" }}>
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: "0.82rem", color: "var(--c-text-muted)", margin: 0, lineHeight: 1.5 }}>
+              Keys are configured securely on the server via <code>backend/.env</code> (12-Factor App methodology). The backend rotates multiple free-tier keys in round-robin and quarantines rate-limited keys (429) automatically to maintain sustained throughput.
             </p>
 
             {/* Current Pool Status */}
-            {keyPoolData && keyPoolData.keys && keyPoolData.keys.length > 0 && (
-              <div style={{ marginBottom: 16, background: "var(--c-surface-2)", padding: 12, borderRadius: 8, border: "1px solid var(--c-border)" }}>
-                <p style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", color: "var(--c-text-muted)", marginBottom: 8 }}>
-                  Active Key Pool ({keyPoolData.healthy_keys}/{keyPoolData.total_keys} Healthy)
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {keyPoolData && keyPoolData.keys && keyPoolData.keys.length > 0 ? (
+              <div style={{ background: "var(--c-surface-2)", padding: 14, borderRadius: 8, border: "1px solid var(--c-border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ fontSize: "0.76rem", fontWeight: 700, textTransform: "uppercase", color: "var(--c-text-muted)" }}>
+                    Active Provider Pool ({keyPoolData.healthy_keys}/{keyPoolData.total_keys} Ready)
+                  </span>
+                  <span style={{ fontSize: "0.72rem", color: "#818cf8", fontFamily: "var(--font-mono, monospace)" }}>
+                    Model: {keyPoolData.active_model}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {keyPoolData.keys.map((k) => (
-                    <div key={k.index} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.78rem" }}>
+                    <div key={k.index} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.8rem", padding: "6px 10px", background: "rgba(255,255,255,0.02)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
                       <span style={{ fontFamily: "var(--font-mono, monospace)" }}>
-                        Key #{k.index} ({k.masked_key})
+                        Key #{k.index} <span style={{ color: "var(--c-text-muted)" }}>({k.masked_key})</span>
                       </span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: "0.7rem", color: "var(--c-text-dim)" }}>
-                          {k.requests_count} reqs
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--c-text-dim)" }}>
+                          {k.requests_count} reqs routed
                         </span>
                         <span className={`badge ${k.is_active ? "badge-SUPPORTS" : "badge-CONTRADICTS"}`}>
                           {k.is_active ? "Active ✓" : `Cooldown (${k.quarantined_seconds_left}s)`}
@@ -479,51 +488,84 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
+            ) : (
+              <div style={{ background: "rgba(99, 102, 241, 0.08)", padding: 14, borderRadius: 8, border: "1px solid rgba(99, 102, 241, 0.25)" }}>
+                <p style={{ fontSize: "0.82rem", color: "var(--c-text)", margin: "0 0 6px 0", fontWeight: 600 }}>
+                  Offline Demonstration Mode
+                </p>
+                <p style={{ fontSize: "0.78rem", color: "var(--c-text-muted)", margin: 0, lineHeight: 1.4 }}>
+                  No Gemini API keys currently loaded in <code>backend/.env</code>. The pre-seeded starter datasets (Delhivery & India Macroeconomy) work 100% offline with complete fact grounding and financial variance matrices.
+                </p>
+              </div>
             )}
 
-            <form onSubmit={handleSaveKeys}>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, marginBottom: 6 }}>
-                  Enter Gemini API Keys (one per line or comma-separated):
-                </label>
-                <textarea
-                  rows={4}
-                  value={keysInput}
-                  onChange={(e) => setKeysInput(e.target.value)}
-                  placeholder={`AIzaSyKey1...\nAIzaSyKey2...\nAIzaSyKey3...`}
-                  style={{
-                    width: "100%", padding: "10px 12px",
-                    background: "var(--c-surface-2)", border: "1px solid var(--c-border)",
-                    borderRadius: 6, color: "var(--c-text)",
-                    fontSize: "0.84rem", fontFamily: "var(--font-mono, monospace)",
-                    outline: "none", resize: "vertical",
-                  }}
-                />
-              </div>
+            {/* How to configure in .env */}
+            <div style={{ background: "var(--c-surface-2)", padding: 12, borderRadius: 8, border: "1px solid var(--c-border)" }}>
+              <p style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", marginBottom: 6 }}>
+                How to configure in backend/.env:
+              </p>
+              <pre style={{
+                margin: 0,
+                fontSize: "0.74rem",
+                fontFamily: "var(--font-mono, monospace)",
+                color: "#93c5fd",
+                background: "rgba(0,0,0,0.3)",
+                padding: "8px 12px",
+                borderRadius: 6,
+                overflowX: "auto",
+              }}>
+{`# Multi-key comma-separated list in backend/.env:
+GEMINI_API_KEYS=key1,key2,key3,key4,key5
 
-              {keyMessage && (
-                <p style={{ fontSize: "0.8rem", color: keyMessage.includes("Error") ? "var(--c-contradicts)" : "var(--c-supports)", marginBottom: 12 }}>
-                  {keyMessage}
-                </p>
-              )}
+# Or individual numbered variables:
+GEMINI_API_KEY_1=your_first_key
+GEMINI_API_KEY_2=your_second_key`}
+              </pre>
+            </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => { setShowKeyModal(false); setKeyMessage(""); }}
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ background: "var(--c-accent)", color: "#fff", padding: "8px 16px", borderRadius: 6, fontWeight: 600 }}
-                >
-                  Save & Rotate Pool
-                </button>
-              </div>
-            </form>
+            {keyMessage && (
+              <p style={{
+                fontSize: "0.8rem",
+                color: keyMessage.includes("Error") ? "var(--c-contradicts)" : "var(--c-supports)",
+                margin: 0,
+                padding: "6px 10px",
+                background: keyMessage.includes("Error") ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)",
+                borderRadius: 6,
+              }}>
+                {keyMessage}
+              </p>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--c-border)", paddingTop: 14 }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={handleReloadKeys}
+                disabled={reloadingKeys}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  border: "1px solid rgba(129, 140, 248, 0.4)",
+                  color: "#818cf8",
+                  fontSize: "0.82rem",
+                  padding: "7px 14px",
+                }}
+                title="Detect and hot-reload keys from backend/.env without restarting backend"
+              >
+                <RefreshCw size={14} className={reloadingKeys ? "spin" : ""} />
+                {reloadingKeys ? "Checking .env..." : "🔄 Reload from .env"}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => { setShowKeyModal(false); setKeyMessage(""); }}
+                style={{ padding: "7px 16px" }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

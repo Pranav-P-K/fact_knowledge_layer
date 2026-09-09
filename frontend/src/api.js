@@ -88,18 +88,7 @@ export async function getKeyPoolStatus() {
   return request("/config/keys");
 }
 
-export async function updateKeyPool(keys) {
-  return request("/config/keys", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keys }),
-  });
+export async function reloadKeyPool() {
+  return request("/config/reload", { method: "POST" });
 }
 
-export async function saveApiKey(key) {
-  return request("/config/key", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key }),
-  });
-}

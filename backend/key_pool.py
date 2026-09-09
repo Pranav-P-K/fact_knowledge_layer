@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai
@@ -58,27 +60,53 @@ class KeyPoolManager:
         self._load_keys_from_env()
 
     def _load_keys_from_env(self) -> None:
-        """Load keys from GEMINI_API_KEYS or GEMINI_API_KEY environment variables."""
-        raw_keys = os.environ.get("GEMINI_API_KEYS", "").strip()
-        single_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        """Load keys exclusively from environment variables / backend/.env."""
+        # Force reload .env from disk to capture any updates
+        env_path = Path(__file__).parent / ".env"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path, override=True)
+        else:
+            load_dotenv(override=True)
 
-        key_list = []
+        key_list: List[str] = []
+
+        # 1. Comma/newline-separated list
+        raw_keys = os.environ.get("GEMINI_API_KEYS", "").strip()
         if raw_keys:
-            key_list.extend([k.strip() for k in raw_keys.split(",") if k.strip()])
+            for k in re.split(r"[,;\n]+", raw_keys):
+                cleaned = k.strip().strip("'\"")
+                if cleaned and cleaned not in key_list:
+                    key_list.append(cleaned)
+
+        # 2. Numbered variables: GEMINI_API_KEY_1, GEMINI_API_KEY_2, ...
+        for i in range(1, 11):
+            var_key = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip().strip("'\"")
+            if var_key and var_key not in key_list:
+                key_list.append(var_key)
+
+        # 3. Single variable: GEMINI_API_KEY
+        single_key = os.environ.get("GEMINI_API_KEY", "").strip().strip("'\"")
         if single_key and single_key not in key_list:
             key_list.append(single_key)
 
         # Filter out placeholders
         valid_keys = [
             k for k in key_list
-            if k and k.lower() not in ("placeholder", "your_gemini_api_key_here", "your_key_here")
+            if k and k.lower() not in ("placeholder", "your_gemini_api_key_here", "your_key_here", "none")
         ]
 
         with self._lock:
             self._keys = [KeyEntry(key=k) for k in valid_keys]
             self._current_index = 0
+            self._models_cache.clear()
 
-        logger.info("KeyPoolManager initialized with %d active key(s).", len(self._keys))
+        logger.info("KeyPoolManager loaded %d active key(s) from .env.", len(self._keys))
+
+    def reload_from_env(self) -> Dict[str, Any]:
+        """Hot-reload key pool from .env without restarting server."""
+        self._load_keys_from_env()
+        return self.get_status()
+
 
     def get_status(self) -> Dict[str, Any]:
         """Return pool status and per-key health metrics."""

@@ -114,18 +114,8 @@ def get_key_pool_status() -> dict:
     return key_pool.get_status()
 
 
-@app.post("/config/keys", tags=["config"])
-def update_key_pool(req: MultiKeyRequest) -> dict:
-    """Update or add multiple Gemini API keys for round-robin pooling."""
-    key_pool.set_keys(req.keys)
-    return {"status": "ok", "message": f"Updated pool with {len(req.keys)} key(s)", "pool": key_pool.get_status()}
+@app.post("/config/reload", tags=["config"])
+def reload_keys_from_env() -> dict:
+    """Hot reload key pool directly from backend/.env without restarting server."""
+    return key_pool.reload_from_env()
 
-
-@app.post("/config/key", tags=["config"])
-def update_single_key(req: KeyRequest) -> dict:
-    new_key = req.key.strip()
-    if not new_key:
-        return {"status": "error", "message": "Key cannot be empty"}
-
-    set_api_key(new_key)
-    return {"status": "ok", "message": "API key updated in pool"}
