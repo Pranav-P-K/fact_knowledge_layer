@@ -116,7 +116,7 @@ docker run -p 8000:8000 -e GEMINI_API_KEYS=your_key superjoin-fact-knowledge-lay
 
 ### 1. Clone
 ```bash
-git clone https://github.com/YOUR_USERNAME/fact_knowledge_layer.git
+git clone https://github.com/Pranav-P-K/fact_knowledge_layer.git
 cd fact_knowledge_layer
 ```
 
