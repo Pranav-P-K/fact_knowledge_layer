@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [selectedFactId, setSelectedFactId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [seeding, setSeeding] = useState(false);
-  const [config, setConfig] = useState({ has_api_key: false, healthy_keys: 0, total_keys: 0, active_model: "gemini-2.0-flash" });
+  const [config, setConfig] = useState({ has_api_key: false, healthy_keys: 0, total_keys: 0, active_model: "gemini-3.5-flash-lite" });
   const [keyPoolData, setKeyPoolData] = useState(null);
 
   // Modals & Telemetry

@@ -10,8 +10,7 @@ A production-grade financial fact extraction, formula auditing, and cross-docume
 
 ## 🎬 Demo Video
 
-Link to 3-minute demo video: **[Watch Superjoin Demo](YOUR_VIDEO_LINK_HERE)**  
-*(Replace with your YouTube / Loom link before submitting)*
+Link to 3-minute demo video: **[Watch Superjoin Demo](https://drive.google.com/file/d/1zY1LCZLrk__J4BWt6q2j3O7wsM3t4o-4/view?usp=sharing)**
 
 ---
 

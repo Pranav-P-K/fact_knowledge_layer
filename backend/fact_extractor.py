@@ -30,8 +30,8 @@ from key_pool import key_pool
 
 logger = logging.getLogger(__name__)
 
-# Preferred model: Gemini 2.0 Flash / 2.5 Flash / 3.5 Flash Lite
-_MODEL_NAME = "gemini-2.0-flash"
+# Preferred model: Gemini 3.5 Flash Lite
+_MODEL_NAME = "gemini-3.5-flash-lite"
 
 
 def get_api_key() -> Optional[str]:
