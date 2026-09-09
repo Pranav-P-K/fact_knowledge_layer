@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, Loader } from "lucide-react";
-import { uploadDocument } from "../api";
+import { uploadDocument, getDocument } from "../api";
 
 const STATUS_COLORS = { done: "#22c55e", failed: "#ef4444", processing: "#6366f1" };
 
@@ -28,7 +28,7 @@ export default function UploadPanel({ onUploadComplete }) {
       const poll = setInterval(async () => {
         attempts++;
         try {
-          const doc = await fetch(`http://localhost:8000/documents/${res.document_id}`).then((r) => r.json());
+          const doc = await getDocument(res.document_id);
           if (doc.status === "done" || doc.status === "failed" || attempts > 120) {
             clearInterval(poll);
             setUploads((u) =>

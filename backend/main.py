@@ -25,7 +25,7 @@ if sys.platform == "win32":
         pass
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -45,6 +45,16 @@ from routers import documents, facts, relationships
 
 # Initialise database on startup
 db.init_db()
+try:
+    conn = db.get_connection()
+    doc_count = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+    conn.close()
+    if doc_count == 0:
+        from seed_data import seed_dataset
+        seed_dataset("delhivery")
+        logging.info("Auto-seeded starter dataset 'delhivery' on empty database startup.")
+except Exception as e:
+    logging.warning("Auto-seed startup check: %s", e)
 
 app = FastAPI(
     title="Fact Knowledge Layer — Superjoin Finance",
@@ -74,14 +84,9 @@ class MultiKeyRequest(BaseModel):
     keys: List[str]
 
 
-@app.get("/", tags=["health"])
-def health() -> dict:
-    return {"status": "ok", "service": "Fact Knowledge Layer for Superjoin Finance"}
-
-
 @app.get("/health", tags=["health"])
 def health_check() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "service": "Fact Knowledge Layer for Superjoin Finance"}
 
 
 @app.get("/export/excel", tags=["export"])
@@ -118,4 +123,42 @@ def get_key_pool_status() -> dict:
 def reload_keys_from_env() -> dict:
     """Hot reload key pool directly from backend/.env without restarting server."""
     return key_pool.reload_from_env()
+
+
+# ── Production Static Frontend Serving ────────────────────────────────────────
+possible_dist_paths = [
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"),
+    os.path.join(os.path.dirname(__file__), "frontend_dist"),
+    os.path.join(os.getcwd(), "frontend", "dist"),
+    os.path.join(os.getcwd(), "dist"),
+]
+frontend_dist = next((p for p in possible_dist_paths if os.path.isdir(p)), None)
+
+if frontend_dist:
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # Do not intercept API routes, export endpoints, or docs
+        api_prefixes = ("api", "documents", "facts", "relationships", "export", "config", "docs", "openapi.json", "redoc", "health")
+        if full_path.startswith(api_prefixes):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/", tags=["health"])
+    def health() -> dict:
+        return {"status": "ok", "service": "Fact Knowledge Layer for Superjoin Finance"}
+
 

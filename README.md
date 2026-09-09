@@ -76,11 +76,39 @@ To overcome free-tier Gemini rate limits (15 RPM) and prevent 429 errors during 
 - Integrated `KeyPoolManager` supporting 5+ Gemini API keys.
 - **Round-robin rotation**: Distributes requests evenly across all configured keys (increasing throughput 5x to 75 RPM).
 - **Automatic 429 quarantine**: If a key hits quota limits, it is quarantined for 60 seconds while requests immediately failover to active healthy keys without dropping tasks.
-- Configure via UI modal or `.env` (`GEMINI_API_KEYS=key1,key2,key3`).
+- Configured strictly via environment variables (`.env` / `GEMINI_API_KEYS=key1,key2,key3`) conforming to 12-Factor App standards, complete with live hot-reloading (`POST /config/reload`) and read-only UI telemetry.
 
 ---
 
-## 🛠️ Setup and Run Instructions
+## 🚀 Cloud Deployment Instructions
+
+The application is engineered to deploy as a **single unified web service** (backend serves the pre-built React SPA) or as a decoupled architecture.
+
+### Option A: Render.com (Recommended — 1-Click Web Service)
+1. Fork or push this repository to GitHub.
+2. In [Render Dashboard](https://dashboard.render.com), click **New +** → **Web Service** → Connect your repository.
+3. Configure the service:
+   - **Environment**: Python
+   - **Build Command**: `cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt`
+   - **Start Command**: `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. In **Environment Variables**, add:
+   - `GEMINI_API_KEYS`: `your_gemini_api_key_1,your_gemini_api_key_2`
+5. Click **Deploy Web Service**. Render provides a single live HTTPS URL hosting both the React UI and FastAPI backend with zero CORS issues!
+
+### Option B: Docker Container (Railway, Fly.io, or GCP Cloud Run)
+Build and run the multi-stage Docker container locally or in cloud:
+```bash
+docker build -t superjoin-fact-knowledge-layer .
+docker run -p 8000:8000 -e GEMINI_API_KEYS=your_key superjoin-fact-knowledge-layer
+```
+
+### Option C: Split Hosting (Vercel Frontend + Render Backend)
+- **Frontend (Vercel)**: Connect repo, set root directory to `frontend`, add Environment Variable `VITE_API_URL=https://your-backend.onrender.com`.
+- **Backend (Render)**: Set root directory to `backend`, Build: `pip install -r requirements.txt`, Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+
+---
+
+## 🛠️ Local Setup and Run Instructions
 
 ### Prerequisites
 - Python 3.10+
@@ -126,3 +154,7 @@ Open **http://localhost:5173** in your browser.
 - [x] Solves all 4 official Brownie Points (Large PDFs, Multi-PDF scale, Dynamic schema, Incremental updates).
 - [x] Superjoin-specific differentiator: 1-Click native Export to Excel Financial Audit Model (`.xlsx`).
 - [x] Multi-Key Round-Robin provider pool eliminates 429 quota exhaustion.
+- [x] 12-Factor App environment variable compliance (`.env` only, live hot-reloading).
+- [x] Complete mobile, tablet, and desktop responsive UI layout.
+- [x] Detailed <3-minute video presentation guide: see [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md).
+
