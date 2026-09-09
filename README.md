@@ -92,6 +92,8 @@ The application is engineered to deploy as a **single unified web service** (bac
    - **Build Command**: `cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt`
    - **Start Command**: `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
 4. In **Environment Variables**, add:
+   - `NODE_VERSION`: `22`
+   - `PYTHON_VERSION`: `3.11.9`
    - `GEMINI_API_KEYS`: `your_gemini_api_key_1,your_gemini_api_key_2`
 5. Click **Deploy Web Service**. Render provides a single live HTTPS URL hosting both the React UI and FastAPI backend with zero CORS issues!
 
